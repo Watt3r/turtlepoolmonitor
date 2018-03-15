@@ -1,6 +1,6 @@
 var networkStat = {
     "trtl": [
-       ["auspool.turtleco.in", "https://auspool.turtleco.in/api/"],
+       ["auspool.turtleco.in", "https://auspool.turtleco.in/api"],
        ["etnchina.io/trtl", "https://turtle-coin.com/api/etnchina.io"],
         ["ny.minetrtl.us", "https://turtle-coin.com/api/ny.minetrtl.us"],
        ["slowandsteady.fun", "https://turtle-coin.com/api/slowandsteady.fun"],
@@ -9,7 +9,7 @@ var networkStat = {
         ["trtl.flashpool.club", "https://api.trtl.flashpool.club"],
         ["trtl.blockchainera.net", "https://turtle-coin.com/api/trtl.blockchainera.net"],
         ["trtl.unipool.pro", "https://pool.turtlecoin.fr:8117"],
-        ["trtlpool.ninja", "https://turtle-coin.com/api/trtlpool.ninja"],
+        //["trtlpool.ninja", "https://turtle-coin.com/api/trtlpool.ninja"],
         ["eu.turtlepool.space", "https://eu.turtlepool.space/api"],
         ["us.turtlepool.space", "https://us.turtlepool.space/api"],
         ["hk.turtlepool.space", "https://hk.turtlepool.space/api"],
@@ -28,35 +28,27 @@ const Discord = require('discord.js');
 const client = new Discord.Client();
 const { prefix, token } = require('./config.json');
 var symbol = "trtl";
+var forkcount = 0;
+var list = [];
+
+
+
+
+NETWORK_STAT_MAP = new Map(networkStat[symbol.toLowerCase()]);
 client.on('ready', () => {
-    console.log('Ready!');
+    console.log('Ready for anything!');
 });
 client.on('message', message => {
     
     if (message.content.startsWith(`${prefix}ping`)) {
     // send back "Pong." to the channel the message was sent in
     message.channel.send('Pong! Your ping is `' + `${Date.now() - message.createdTimestamp}` + ' ms`');
-    } else if (message.content === `${prefix}list`) {
-      //message.channel.send(`There are these pools beiong monitored: ${networkStat[1]}`)
-      for(var i in networkStat){
-      pool = networkStat[i];
-      message.channel.send(pool);
-      }
-
-
-
-
-    } else if (message.content === `${prefix}check`) {
-        for(var i in networkStat){
-        pool = networkStat[i].toString();
-        NETWORK_STAT_MAP = new Map(networkStat[symbol.toLowerCase()]);
-
-
+    } else if (message.content.startsWith(`${prefix}fork`)) {
         NETWORK_STAT_MAP.forEach((url, host, map) => {
-            console.log(url);
             https.get(url + '/stats', (resp) => {
             let data = '';
-             
+            resp.setEncoding('utf8');
+            //console.log('headers:', resp.headers);
             // A chunk of data has been recieved.
             resp.on('data', (chunk) => {
                 data += chunk;
@@ -66,14 +58,111 @@ client.on('message', message => {
             resp.on('end', () => {
                 try {
                     json = data;
-                    message.channel.send(`${url}/stats Block height ${json.network.height}`)
+                    console.log(json.network.height);
+                }
+                catch(err) {
+                    json = JSON.parse(data);
+                    console.log(json.network.height);
+                    console.log(err);
+                }
+                list.push([json.network.height, url]);
+                findDifferentHeight();
+
+                function findDifferentHeight() {
+                    for(var i in list) {
+                        //console.log(list[0]);
+                        //console.log(list[0][0]);
+                        //console.log(list[0][1]);
+                        if(list.length > 1){
+                            //console.log(list);
+                            var first = list[i][0];
+                            var second = list[i++][0];
+                            if(first < second) {
+                                message.channel.send("FORK at " + list[i][1]);
+                                forkcount++;
+                            } else {
+                                // No Fork
+                            }
+                        }
+                    }
+                }
+
+            });
+
+             
+            }).on("error", (err) => {
+              console.log("Error: " + err.message + url);
+            });
+        });
+        if (forkcount < 1) {
+                            message.channel.send("No forks!")
+                    } else {
+                        forkcount = 0;
+        }
+    } else if (message.content.startsWith(`${prefix}help`)){
+
+        message.channel.send({embed: {
+            color: 0x00853D,
+            author: {
+              name: client.user.username,
+              icon_url: client.user.avatarURL
+            },
+            title: "Help Guide",
+            description: "Prefix: %",
+            fields: [{
+                name: "Height",
+                value: "List all (known) pools and their height."
+              },
+              {
+                name: "Forks",
+                value: "Test network to see if there are any forks."
+              },
+              {
+                name: "Ping",
+                value: "Test connection to bot."
+              },
+              {
+                name: "Help",
+                value: "List this help guide."
+              }
+            ],
+            timestamp: new Date(),
+            footer: {
+              icon_url: client.user.avatarURL,
+              text: "Made by Watt Erikson"
+            }
+          }
+        });
+
+    } else if (message.content.startsWith(`${prefix}height`)) {
+        for(var i in networkStat){
+        pool = networkStat[i].toString();
+        
+
+
+        NETWORK_STAT_MAP.forEach((url, host, map) => {
+            https.get(url + '/stats', (resp) => {
+            let data = '';
+            resp.setEncoding('utf8');
+            //console.log('headers:', resp.headers);
+            // A chunk of data has been recieved.
+            resp.on('data', (chunk) => {
+                data += chunk;
+            });
+             
+            // The whole response has been received. Parse the Height.
+            resp.on('end', () => {
+                try {
+                    json = data;
+                    message.channel.send(`${url}/stats Block height ${json.network.height}`);
+                    //console.log(json)
                 }
                 catch(err) {
                     json = JSON.parse(data);
                     message.channel.send(`${url}/stats ; ${json.network.height}`)
-                    console.log(err + '\n' + url);
                 }
             });
+
              
             }).on("error", (err) => {
               console.log("Error: " + err.message + url);
@@ -81,5 +170,4 @@ client.on('message', message => {
         });
     }}
 });
-
-client.login('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+client.login('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
