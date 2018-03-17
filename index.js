@@ -4,7 +4,7 @@ var networkStat = {
        ["etnchina.io/trtl", "https://turtle-coin.com/api/etnchina.io"],
         ["ny.minetrtl.us", "https://turtle-coin.com/api/ny.minetrtl.us"],
        ["slowandsteady.fun", "https://turtle-coin.com/api/slowandsteady.fun"],
-       //["trtl.mine2gether.com", "https://trtl.mine2gether.com/api"],
+       ["trtl.mine2gether.com", "https://trtl.mine2gether.com/api"],
         ["trtl.ninja", "https://trtl.ninja/api"],
         ["trtl.flashpool.club", "https://api.trtl.flashpool.club"],
         ["trtl.blockchainera.net", "https://turtle-coin.com/api/trtl.blockchainera.net"],
@@ -34,72 +34,87 @@ var list = [];
 
 
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+
+
 NETWORK_STAT_MAP = new Map(networkStat[symbol.toLowerCase()]);
 client.on('ready', () => {
     console.log('Ready for anything!');
 });
-client.on('message', message => {
-    
-    if (message.content.startsWith(`${prefix}ping`)) {
+client.on('message', async message => {
+    const args = message.content.slice(prefix.length).trim().split(/ +/g);
+    const command = args.shift().toLowerCase();
+    if (command === 'ping') {
     // send back "Pong." to the channel the message was sent in
     message.channel.send('Pong! Your ping is `' + `${Date.now() - message.createdTimestamp}` + ' ms`');
-    } else if (message.content.startsWith(`${prefix}fork`)) {
-        NETWORK_STAT_MAP.forEach((url, host, map) => {
-            https.get(url + '/stats', (resp) => {
-            let data = '';
-            resp.setEncoding('utf8');
-            //console.log('headers:', resp.headers);
-            // A chunk of data has been recieved.
-            resp.on('data', (chunk) => {
-                data += chunk;
-            });
-             
-            // The whole response has been received. Parse the Height.
-            resp.on('end', () => {
-                try {
-                    json = data;
-                    console.log(json.network.height);
-                }
-                catch(err) {
-                    json = JSON.parse(data);
-                    console.log(json.network.height);
-                    console.log(err);
-                }
-                list.push([json.network.height, url]);
-                findDifferentHeight();
+    } else if (command === 'fork') {
+        message.channel.send("Listening for forks...");
+        testFork();
 
-                function findDifferentHeight() {
-                    for(var i in list) {
-                        //console.log(list[0]);
-                        //console.log(list[0][0]);
-                        //console.log(list[0][1]);
-                        if(list.length > 1){
-                            //console.log(list);
-                            var first = list[i][0];
-                            var second = list[i++][0];
-                            if(first < second) {
-                                message.channel.send("FORK at " + list[i][1]);
-                                forkcount++;
-                            } else {
-                                // No Fork
+        async function testFork() {
+            while (1<2) { // Loop to listen for forks
+                    console.log("RAN");
+                    NETWORK_STAT_MAP.forEach((url, host, map) => { // Ping each fork and get height
+                        https.get(url + '/stats', (resp) => {
+                        let data = '';
+                        resp.setEncoding('utf8');
+                        // A chunk of data has been recieved.
+                        resp.on('data', (chunk) => {
+                            data += chunk;
+                        });
+                         
+                        // The whole response has been received. Parse the Height.
+                        resp.on('end', () => {
+                            try {
+                                json = data;
+                                console.log(json.network.height);
                             }
-                        }
-                    }
-                }
+                            catch(err) {
+                                json = JSON.parse(data);
+                                //console.log(json.network.height);
+                                //console.log(err);
+                            }
+                            list.push([json.network.height, url]);
+                            findDifferentHeight();
 
-            });
+                            function findDifferentHeight() { // Find if there is a fork
+                                for(var i in list) {
+                                    if(list.length > 1){
+                                        var first = list[i][0];
+                                        var second = list[i++][0];
+                                        if(Math.abs(first - second) >= 10) {
+                                            let forkedmessage = "FORK at " + list[i][1] + " Uh oh @" + networkStat[i][2] + " Looks like your pool has forked!";
+                                            message.channel.send(forkedmessage);
+                                            forkcount++;
+                                        } else {
+                                            // No Fork
+                                        }
+                                    }
+                                }
+                            }
 
-             
-            }).on("error", (err) => {
-              console.log("Error: " + err.message + url);
-            });
-        });
-        if (forkcount < 1) {
-                            message.channel.send("No forks!")
+                        });
+
+                         
+                        }).on("error", (err) => {
+                          console.log("Error: " + err.message + url);
+                        });
+                    });
+                    if (forkcount < 1) {
+                        // No Forks!
                     } else {
                         forkcount = 0;
+                    }
+                    await sleep(5000)
+            }
         }
-    } else if (message.content.startsWith(`${prefix}help`)){
+
+
+    } else if (command === 'help'){
 
         message.channel.send({embed: {
             color: 0x00853D,
@@ -134,7 +149,7 @@ client.on('message', message => {
           }
         });
 
-    } else if (message.content.startsWith(`${prefix}height`)) {
+    } else if (command === 'height') {
         for(var i in networkStat){
         pool = networkStat[i].toString();
         
@@ -168,6 +183,10 @@ client.on('message', message => {
               console.log("Error: " + err.message + url);
             });
         });
-    }}
+    }} else if (command === 'add') {
+        let [pool, api, user] = args;
+        message.channel.send(`Hello ${message.author.username}, Pool url ${pool} Api link ${api} Thanks ${user}.`);
+
+    }
 });
-client.login('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+client.login('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
